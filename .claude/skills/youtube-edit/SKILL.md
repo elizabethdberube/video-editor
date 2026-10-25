@@ -138,6 +138,34 @@ ahead and try it out." (5.1s WAV.)
   (don't block the edit). Background: the FTC says the platform box alone
   isn't enough; an in-video statement is what counts.
 
+## Naming: name each video after the product (Liz, 2026-10-25)
+
+"for future videos can you try to name them after the product". Use the
+product name, lowercase, words joined by hyphens, then `_amazon` or
+`_youtube`: e.g. `vosker-v150-security-camera_amazon`,
+`saian-pumpkin-spice-mask_amazon`. Use it as the render `--name` so the
+work folder and the finished file (`<name>.mp4`) match. Take the product
+name from the packaging/label in the footage (speech-to-text mishears brand
+names -- "cyan" was Saian, "F150" was V150). No spaces or special characters.
+
+## Amazon review content rules (applied 2026-10-24/25, she approved each)
+
+- At least 2 minutes; otherwise as long as looks best. No background music.
+- Cut price / subscription-cost talk and on-screen prices or offers ("$9.99",
+  "1 month free", "5 free songs" -> cover with B-roll), and purchase-option
+  talk ("two-pack, or buy them individually"). Amazon's review guidelines
+  (as quoted on seller forums -- the official page kept erroring) exclude
+  pricing, availability and ordering options.
+- No copyrighted music: cut song demos (and lyrics/song titles on screens)
+  and devices' own promo videos (their voiceover + music).
+- Cut sponsor-sounding phrases ("brought to you by"); keep one call to
+  action, at the end. Free samples are fine for her to accept.
+- Plus the gifted disclosure rule above.
+- A YouTube review can be turned into an Amazon version from the same
+  source + plan: drop music, add the disclosure, apply the cuts above. A
+  finished YouTube render can't -- its music is baked in; ask for the
+  original clip.
+
 ## Rule: edit out personal information, always (Liz, 2026-10-23)
 
 Her words: "edit out any passwords or emails or address any personal
