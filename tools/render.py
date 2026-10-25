@@ -45,7 +45,11 @@ Any segment can also take:
               {"clip": "rec", "start": 196, "at": 44.0, "duration": 5}]
         Full-frame cutaways: the picture switches to a photo (slow push-in)
         or another clip (from its own source "start", in that clip's
-        layout) while this segment's audio keeps playing.
+        layout) while this segment's audio keeps playing. A clip cutaway can
+        take the same "zoom" as a clip segment, e.g. to push in on a detail.
+    "blur": [{"at": 55.45, "duration": 0.85, "x": 0.27, "y": 0.06, "w": 0.43, "h": 0.41}]
+        Pixelate a rectangle (fractions of the frame) for a while -- for
+        personal info that can't be cut, like a device ID label.
     "music": false
         Keep the background music silent during this segment (it ramps out
         and back in around it) -- e.g. clips that already have music baked in.
@@ -90,6 +94,11 @@ Any segment can also take:
     (so re-trimming the segment doesn't move the graphic off its moment);
     on a photo or block it's seconds into the segment. Anything that would
     start outside the segment is skipped with a warning.
+
+Amazon reviews ("destination": "amazon") must include Liz's gifted-product
+disclosure: a block whose audio is {"file": "@amazon_disclosure", "at": 0}
+(the clip lives in _editor/assets/disclosure/amazon_gifted_disclosure.wav).
+Render stops if the clip is missing on this computer or the plan lacks it.
 
 Plan-level options:
     "format": "landscape" (1920x1080, default) | "vertical" (1080x1920, Shorts) | "square" (1080x1080)
@@ -167,11 +176,54 @@ VOICE_CLEANUP = ("highpass=f=80,afftdn=nf=-60:nr=15:tn=1,"
                  "agate=threshold=0.01:ratio=3:attack=5:release=250:range=0.25")
 
 
+PEAK_GUARD = "alimiter=limit=0.5:attack=1:release=60:level=false"   # -6 dBFS
+# Final ceiling after loudnorm. Measured on WhatsApp audio: guard + this ->
+# -14.5 LUFS at -1.4 dBTP (without the guard, a final limiter alone made the
+# encoded peaks worse, +0.8 dBTP).
+FINAL_CEILING = "alimiter=limit=0.79:attack=5:release=80:level=false"
+
+
+# Liz's gifted-product disclosure ("This company was kind enough to gift this
+# item to me, so let's go ahead and try it out."), required in every Amazon
+# review. Lives in the footage folder's shared assets, not the repo, so each
+# computer needs its own copy -- render refuses Amazon plans without it.
+DISCLOSURE = "@amazon_disclosure"
+
+
+def disclosure_path() -> Path:
+    return assets_dir("disclosure") / "amazon_gifted_disclosure.wav"
+
+
+def audio_file(name: str, wd: Path) -> Path:
+    """Block voiceover files: relative to the work dir, or the disclosure shortcut."""
+    return disclosure_path() if name == DISCLOSURE else wd / name
+
+
+def check_amazon_disclosure(plan):
+    """Amazon reviews must play the gifted disclosure. Stop, with
+    instructions, if the clip isn't on this computer or the plan forgot it."""
+    if plan.get("destination") != "amazon":
+        return
+    path = disclosure_path()
+    if not path.exists():
+        sys.exit(f"Amazon review needs the gifted-product disclosure clip, but it isn't on this computer.\n"
+                 f"Put it here: {path}\n(the 5s WAV of Liz saying 'This company was kind enough to gift "
+                 f"this item to me, so let's go ahead and try it out.')")
+    used = any(a.get("file") == DISCLOSURE for s in plan["segments"] for a in s.get("audio", []))
+    if not used:
+        sys.exit("Amazon review plan doesn't include the gifted disclosure. Add a block segment with "
+                 f"\"audio\": [{{\"file\": \"{DISCLOSURE}\", \"at\": 0}}] -- normally right after her "
+                 "intro names the product, before the demo.")
+
+
 def voice_chain(clip: dict, cleanup: bool, level_db=None) -> str:
     """Speech processing for one clip's own audio: level-matching gain (from
     "voice_level_lufs", see set_voice_levels), then optional cleanup."""
     level_db = clip.get("_level_db") if level_db is None else level_db
-    chain = f"volume={level_db:.2f}dB," if level_db else ""
+    # The limiter right after the gain catches handling noise: on quiet phone
+    # speech (-32 dB RMS) a +12 dB level gain pushed box crinkles and jar taps
+    # to +11 dBFS, which nothing downstream could tame cleanly.
+    chain = f"volume={level_db:.2f}dB,{PEAK_GUARD}," if level_db else ""
     if cleanup and clip.get("voice_cleanup", True):
         chain += VOICE_CLEANUP + ","
     return chain
@@ -225,7 +277,7 @@ def set_voice_levels(plan, clips, root, wd, target):
             seg["_level_db"] = level(c, root / c["file"], c.get("audio_track", 0), seg["start"], seg["end"])
         for a in seg.get("audio", []):
             if "file" in a:
-                a["_level_db"] = target - measure_loudness(wd / a["file"], 0, wd)
+                a["_level_db"] = target - measure_loudness(audio_file(a["file"], wd), 0, wd)
             else:
                 c = clips[a["clip"]]
                 a["_level_db"] = level(c, root / c["file"], c.get("audio_track", 0), a["start"], a["end"])
@@ -697,7 +749,7 @@ def block_graph(seg, clips, root, wd, cmd, dur, cleanup):
     for k, a in enumerate(seg.get("audio", [])):
         i = n_inputs(cmd)
         if "file" in a:
-            cmd += ["-i", str(wd / a["file"])]
+            cmd += ["-i", str(audio_file(a["file"], wd))]
             track, fades, voice = 0, "", voice_chain(a, cleanup)
         else:
             c = clips[a["clip"]]
@@ -755,6 +807,25 @@ def placed_items(seg, key, dur, label):
                   f"{seg_label(seg)}, skipped", file=sys.stderr)
 
 
+def blur_graph(seg, dur, vlabel) -> tuple[str, str]:
+    """Pixelate + blur rectangles for a while (hide a label, a screen, a
+    plate). x/y/w/h are fractions of the frame; "at" follows the overlays
+    rule (clip SOURCE time on clip segments). Size the box with margin:
+    hand-held things drift, so check every frame afterwards."""
+    fc = ""
+    for k, (r, t) in enumerate(placed_items(seg, "blur", dur, "note")):
+        x, y = even(W * r["x"]), even(H * r["y"])
+        w, h = even(W * r["w"]), even(H * r["h"])
+        end = min(t + r["duration"], dur)
+        px = r.get("pixel", 24)
+        fc += (f";[{vlabel}]split[bm{k}][bs{k}];"
+               f"[bs{k}]crop={w}:{h}:{x}:{y},scale={max(2, w // px)}:{max(2, h // px)},"
+               f"scale={w}:{h}:flags=neighbor,boxblur=6:2[bb{k}];"
+               f"[bm{k}][bb{k}]overlay={x}:{y}:enable='between(t,{t:.3f},{end:.3f})'[vbl{k}]")
+        vlabel = f"vbl{k}"
+    return fc, vlabel
+
+
 def broll_graph(seg, clips, root, wd, cmd, dur, vlabel) -> tuple[str, str]:
     """Full-frame cutaways over the picture; the segment's audio carries on."""
     fc = ""
@@ -772,9 +843,17 @@ def broll_graph(seg, clips, root, wd, cmd, dur, vlabel) -> tuple[str, str]:
             speed = b.get("speed", 1.0)
             cmd += ["-ss", f"{b['start']:.3f}", "-to", f"{b['start'] + d * speed:.3f}",
                     "-i", str(root / c["file"])]
-            fc += (f";[{i}:v]{retime(d * speed, speed)}[bx{k}];"
-                   + layout_filter(c.get("layout", "fill"), f"bx{k}", f"by{k}"))
-        fc += (f";[by{k}]trim=end={d:.3f},setpts=PTS-STARTPTS+{t:.3f}/TB[bz{k}];"
+            restore = c.get("restore", False)
+            fc += (f";[{i}:v]{retime(d * speed, speed)}{',' + RESTORE_PRE if restore else ''}[bx{k}];"
+                   + layout_filter(c.get("layout", "fill"), f"bx{k}", f"by{k}", restore))
+            if "zoom" in b:  # same punch-in as clip segments, e.g. push in on a detail
+                fc += ";" + zoom_filter(b["zoom"], d, f"by{k}", f"byz{k}")
+                fc += f";[byz{k}]null[bw{k}]"
+            else:
+                fc += f";[by{k}]null[bw{k}]"
+        if "photo" in b:
+            fc += f";[by{k}]null[bw{k}]"
+        fc += (f";[bw{k}]trim=end={d:.3f},setpts=PTS-STARTPTS+{t:.3f}/TB[bz{k}];"
                f"[{vlabel}][bz{k}]overlay=0:0:eof_action=pass[vB{k}]")
         vlabel = f"vB{k}"
     return fc, vlabel
@@ -833,6 +912,8 @@ def render_segment(seg, clips, root, wd, out: Path, cleanup: bool, sfx_dir: Path
             tf.setdefault("rotate", angle)
         fc += ";" + transform_graph(tf, dur, vlabel, "vtf")
         vlabel = "vtf"
+    zfc, vlabel = blur_graph(seg, dur, vlabel)
+    fc += zfc
     bfc, vlabel = broll_graph(seg, clips, root, wd, cmd, dur, vlabel)
     fc += bfc
     if "pip" in seg:
@@ -1043,7 +1124,7 @@ def finalise(plan, cfg, joined: Path, wd: Path, final: Path, captions: Path | No
         m = json.loads(err[err.rindex("{"):err.rindex("}") + 1])
         level = (f"loudnorm={LOUDNORM}:linear=true:measured_I={m['input_i']}:measured_TP={m['input_tp']}:"
                  f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:"
-                 f"offset={m['target_offset']},aresample=48000")
+                 f"offset={m['target_offset']},aresample=48000,{FINAL_CEILING}")
     else:
         level = "anull"
 
@@ -1140,6 +1221,7 @@ def main():
     for seg in plan["segments"]:
         for k, v in plan.get("defaults", {}).items():
             seg.setdefault(k, v)
+    check_amazon_disclosure(plan)
     if plan.get("music") and plan.get("destination") != "youtube":
         sys.exit(f"plan has music but destination is {plan.get('destination')!r}: background music "
                  f"is only for YouTube videos, never Amazon. Set \"destination\": \"youtube\" or drop \"music\".")

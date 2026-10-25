@@ -106,6 +106,38 @@ YouTube videos. ffmpeg (LGPL/GPL), OpenCV (Apache 2.0), YuNet face model
 watermarking tools, "personal use only" assets, or cloud services. If a
 license needs a credit (OpenMoji CC BY-SA), tell her the credit line.
 
+## Rule: every Amazon review includes the gifted-product disclosure (Liz, 2026-10-25)
+
+Her words: "use it in every amazon review. You need to disclose that the
+item was gifted to you and the clip does that." The clip is her voice
+saying: "This company was kind enough to gift this item to me, so let's go
+ahead and try it out." (5.1s WAV.)
+
+- **Where it lives:** `<footage_root>/_editor/assets/disclosure/amazon_gifted_disclosure.wav`
+  (on the Windows laptop: `C:\Users\eliza\Videos\YouTube\_editor\assets\disclosure\`).
+  It is NOT in the git repo, so each computer needs its own copy.
+- **First step of every Amazon review, before planning anything:** check
+  that file exists. If it doesn't, stop and ask her to add it, and tell her
+  the exact path for that computer. Don't build the edit without it.
+  (render.py enforces the same thing: `check_amazon_disclosure` refuses an
+  Amazon plan if the clip is missing or no segment uses it.)
+- **How to use it:** a block segment whose audio is
+  `{"file": "@amazon_disclosure", "at": 0}`, over a clean product shot
+  from that review (no personal info, no prices/offers on screen). Default
+  placement: right after her intro names the product, before the demo --
+  the line ends "so let's go ahead and try it out", and disclosures belong
+  early. Only once per video.
+- The source was a webcam recording (WIN_20261025_10_19_14_Pro.mp4). If the
+  clip ever needs re-making, trim to the sentence (0.10-5.35s there).
+- **YouTube reviews: don't add this clip** (Liz, 2026-10-25: "I can say it
+  myself in youtube"). She discloses gifts/sponsorships in her own words
+  while filming and uses YouTube's paid-promotion box. When editing a
+  YouTube review: never cut her disclosure line (gifted, sent to me,
+  sponsored, partnered, etc.) -- keep it early in the cut. If the
+  transcript has no disclosure at all, say so when handing the video over
+  (don't block the edit). Background: the FTC says the platform box alone
+  isn't enough; an in-video statement is what counts.
+
 ## Rule: edit out personal information, always (Liz, 2026-10-23)
 
 Her words: "edit out any passwords or emails or address any personal
