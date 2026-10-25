@@ -138,6 +138,24 @@ ahead and try it out." (5.1s WAV.)
   (don't block the edit). Background: the FTC says the platform box alone
   isn't enough; an in-video statement is what counts.
 
+## Cut "um", "ah" and throat-clears when possible (Liz, 2026-10-25)
+
+"Also edit out um and ah when you can." Parakeet usually drops fillers
+from the transcript, so they hide in the gaps between words.
+- Run `python tools/fillers.py --name <video>` on every edit. It lists
+  gaps containing a voiced burst well above room tone (plus any filler
+  words the transcript did catch), each as source times between two words.
+- It's a candidate list, not truth: lid snaps and clacks can read as
+  "voiced". Check doubtful ones (spectrogram: an um/ah shows clean
+  horizontal pitch lines like speech; a throat-clear is a rough low burst;
+  a click is a short broadband spike) before cutting.
+- Cut from the end of the word before to the start of the word after, so
+  no real word is clipped; join with a 0.2s crossfade (or a small punch-in
+  zoom on a static talking shot) so the jump isn't jarring.
+- Skip one if cutting it would break a visible action mid-demo or leave an
+  unnatural rhythm -- "when you can" means judgment, not every single one.
+- Tell her how many were cut.
+
 ## Naming: name each video after the product (Liz, 2026-10-25)
 
 "for future videos can you try to name them after the product". Use the

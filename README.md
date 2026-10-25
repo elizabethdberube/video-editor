@@ -50,6 +50,8 @@ tied to a moment.
   transparent overlay, for `render.py` to composite over footage
 - `speakers.py` — identifies who's speaking per segment via voiceprints
   (two-speaker footage only; not yet verified on real hardware)
+- `fillers.py` — finds "um", "ah" and throat-clears between words (the
+  speech-to-text usually leaves them out) so they can be cut
 - `catalog_music.py` — measures BPM/LUFS/energy/brightness/vocals for a
   folder of background music (point `music_dir` in `config.json` at it
   once you have one)
